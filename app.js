@@ -1,125 +1,166 @@
 const WIDTH = 1280;
 const HEIGHT = 640;
+const HALFW = 640;
+const HALFH = 320;
 
-class Bird {
-  constructor() {
-    this.X = 200;
-    this.Y = 100;
-    this.R = 40;
-    this.Gravity = 0.4;
-    this.Speed = 0;
-    this.Score = 0;
+const TotalVirus = 100;
+
+let leftBuffer;
+let rightBuffer;
+let test1;
+let test2;
+
+class Person{
+  constructor(x, y, state){
+    this.state = state;   // 0 -> Clean , 1 -> Infected
+    this.x = x;
+    this.y = y;
+    this.r = 10;
+    this.velocityX = Math.floor(Math.random()*2)-1;
+    this.velocityY = Math.floor(Math.random()*2)-1;
   }
+  update(){
+    this.x += this.velocityX;
+    if(HALFW <= this.x-this.r) this.x -= HALFW-this.r;
+    else if(this.x+this.r <= 0) this.x += HALFW+this.r*2;
 
-  move(autoPilot) {
-    if (keyIsPressed === true || autoPilot === 1) {
-      this.Speed = -6;
+    this.y += this.velocityY;
+    if(HEIGHT <= this.y-this.r) this.y -= HEIGHT-this.r;
+    else if(this.y+this.r <= 0) this.y += HEIGHT+this.r*2;
+  }
+  detectCollision(target){
+    let distance = Math.pow(this.x - target.x, 2) + Math.pow(this.y - target.y, 2);
+    let range = this.r*this.r + target.r*target.r;
+
+    if(distance <= range){
+      distance = Math.sqrt(distance);
+
+      let Overlap = 0.2 * (distance - this.r - target.r);
+      
+      this.x -= Overlap * (this.x - target.x) / distance;
+      this.y -= Overlap * (this.y - target.y) / distance;
+
+      target.x += Overlap * (this.x - target.x) / distance;
+      target.y += Overlap * (this.y - target.y) / distance;
+
+      return true;
+    } 
+    else return false;
+  }
+  draw(side){
+    side.circle(this.x, this.y, this.r);
+  }
+}
+class Test {
+  constructor(C, I){
+    this.cleans = [];
+    this.infecteds= [];
+    for (var i = 0; i < C; i++){
+      this.cleans.push(new Person(Math.floor(Math.random()*HALFW), Math.floor(Math.random()*HEIGHT), 0));
     }
-    this.Speed += this.Gravity;
-    this.Y += this.Speed;
+    for (var i = 0; i < I; i++){
+      this.infecteds.push(new Person(Math.floor(Math.random()*HALFW), Math.floor(Math.random()*HEIGHT), 1));
+    }
   }
-
-  show() {
-    fill("white");
-    circle(this.X, this.Y, this.R);
-  }
-
-  printScore(pipe) {
-    if(this.X === pipe.X + pipe.W) this.Score += 1;
-    textSize(32);
-    fill("green");
-    text('Score :', 10, 30);
-    text(this.Score, 150, 30);
-  }
-
-  detectCollision(pipe){
-    if(pipe.X <= this.X && this.X <= pipe.X + pipe.W){
-      if((pipe.Y1 <= this.Y && this.Y <= pipe.Y1 + pipe.H1) || (pipe.Y2 <= this.Y && this.Y <= pipe.Y2 + pipe.H2)){
-        //Check collision with the nearest pipe.
-        alert("Score : " + this.Score);
-        window.location.reload();
-        return;
+  update(){
+    let people = this.cleans.concat(this.infecteds);
+    for (var i = 0; i < TotalVirus-1; i++){
+      for (var j = i+1; j < TotalVirus; j++){
+        //check detection
+        if(people[i].detectCollision(people[j])){
+          if(people[i].state == 1 || people[j].state == 1){
+            people[i].state = 1;
+            people[j].state = 1;
+          }
+          this.checkCleans();
+        }
       }
     }
-    //Check collision with the screen borders.
-    if(this.Y >= HEIGHT - 1) {
-      this.Y = HEIGHT - 1;
-      this.Speed = 0;
-    }
-    else if(this.Y <= 1) {
-      this.Y = 1;
-      this.Speed = 0;
+
+    for(var i = 0; i < this.cleans.length; i++) this.cleans[i].update();
+    for(var i = 0; i < this.infecteds.length; i++) this.infecteds[i].update();
+  }
+  checkCleans(){
+    for(var i = 0; i < this.cleans.length; i++){
+      if(this.cleans[i].state == 1){
+        this.infecteds.push(new Person(this.cleans[i].x, this.cleans[i].y, 1));
+        this.cleans.splice(i, 1);
+      }
     }
   }
+  draw(side){
+    side.stroke("lightgreen");
+    side.fill("green");
+    for (var i = 0; i < this.cleans.length; i++) this.cleans[i].draw(side);
 
-  think(pipe){
-    if(pilot === true) {
-      let targetY = pipe.Y2 - (pipe.Space / 2);
-      stroke('red');
-      strokeWeight(3);
-      line(this.X, this.Y, pipe.X + pipe.W, targetY);
-      if(this.Y > targetY - 3) return 1;
-      else return 0;
-    }
-    else return 0;
+    side.stroke("red");
+    side.fill("darkred");
+    for (var i = 0; i < this.infecteds.length; i++) this.infecteds[i].draw(side);
   }
 }
 
-class Pipe {
-  constructor(i) {
-    this.X = WIDTH;
-    this.Y1 = 0;
-    this.H1 = 50 + (Math.random()*390);
-    this.W = 100;
-    this.Space = 150;
-    this.Velocity = 5;
 
-    this.Y2 = this.Y1 + this.H1 + this.Space;
-    this.H2 = HEIGHT - (this.H1 + this.Space);
-  }
-
-  move(pipes) {
-    if(this.X + this.Space < 0) pipes.splice(0, 1);
-    else if(this.X === WIDTH/2) pipes.push(new Pipe());
-    this.X -= this.Velocity;
-  }
-
-  show() {
-    fill("black");
-    rect(this.X, this.Y1, this.W, this.H1);
-    rect(this.X, this.Y2, this.W, this.H2);
-  }
+function createNewTest(){
+  test1 = new Test(TotalVirus - input1.value(), input1.value());
+  test2 = new Test(TotalVirus - input2.value(), input2.value());
 }
-
-let bird = new Bird();
-let pipes = [];
-let pilot = true;
 
 function setup() {
-  createCanvas(WIDTH, HEIGHT);
-  pipes[0] = new Pipe();
-  button = createButton('Auto Pilot: On/OFF');
-  button.position(1300, 200);
-  button.size(150, 100);
-  button.mousePressed(autoPilot);
+  var cnv = createCanvas(WIDTH, HEIGHT);
+  cnv.background("lightblue");
+  cnv.center("horizontal");
+  leftBuffer = createGraphics(HALFW, HEIGHT);
+  rightBuffer = createGraphics(HALFW, HEIGHT);
+
+  button = createButton('SET VIRUS');
+  button.position((window.innerWidth)/2 - (button.width)/2, (window.innerHeight)/2 + HALFH);
+  button.mousePressed(createNewTest);
+
+  input1 = createSlider(5, 95, 5);
+  input1.position(button.x - input1.width - 100, button.y);
+  input2 = createSlider(5, 95, 35);
+  input2.position(button.x + button.width + 100, button.y);
+
+  test1 = new Test(TotalVirus - input1.value(), input1.value());
+  test2 = new Test(TotalVirus - input2.value(), input2.value());
 }
 
 function draw() {
-  clear();
-  background("lightblue");
-  stroke('black');
-  strokeWeight(5);
-  for (var i = 0; i < pipes.length; i++) {
-    pipes[i].move(pipes);
-    pipes[i].show();
-  }
-  bird.move(bird.think(pipes[0]));
-  bird.show();
-  bird.detectCollision(pipes[0]);
-  bird.printScore(pipes[0]);
+  drawLeftBuffer();
+  drawRightBuffer();
+  drawStats()
 }
 
-function autoPilot() {
-  if(pilot === true) pilot = false;
-  else pilot = true;
+function drawLeftBuffer() {
+  leftBuffer.background(85);
+  test1.update();
+  test1.draw(leftBuffer);
+  image(leftBuffer, 0, 0);
+}
+
+function drawRightBuffer() {
+  rightBuffer.background(85);
+  test2.update();
+  test2.draw(rightBuffer);
+  image(rightBuffer, HALFW, 0);
+}
+
+function drawStats() { 
+  textSize(32);
+  fill("white");
+  noStroke();
+
+  text('Clean :', 10, 30);
+  text(test1.cleans.length, 120, 30);
+  text('Infected :', 450, 30);
+  text(test1.infecteds.length, 585, 30);
+
+  text('Clean :', HALFW+10, 30);
+  text(test2.cleans.length, HALFW+120, 30);
+  text('Infected :', HALFW+450, 30);
+  text(test2.infecteds.length, HALFW+585, 30);
+
+  stroke(6, 98, 184);
+  strokeWeight(2);
+  line(HALFW, 0, HALFW, HEIGHT);
 }
